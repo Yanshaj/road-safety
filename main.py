@@ -105,4 +105,63 @@ async def get_detections(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(DetectionEvent).order_by(DetectionEvent.timestamp.desc()))
     return result.scalars().all()
 
+# ─── Training / Seed Data ────────────────────────────────────────────────────
+
+SEED_EVENTS = [
+    # Chandigarh
+    {"latitude": 30.7333, "longitude": 76.7794, "damage_type": "pothole",            "severity_score": 0.95, "image_url": None},
+    {"latitude": 30.7270, "longitude": 76.7700, "damage_type": "pothole",            "severity_score": 0.91, "image_url": None},
+    {"latitude": 30.7400, "longitude": 76.7850, "damage_type": "alligator_cracking", "severity_score": 0.78, "image_url": None},
+    {"latitude": 30.7100, "longitude": 76.7600, "damage_type": "longitudinal_crack", "severity_score": 0.42, "image_url": None},
+    {"latitude": 30.7500, "longitude": 76.7900, "damage_type": "pothole",            "severity_score": 0.88, "image_url": None},
+    {"latitude": 30.7200, "longitude": 76.8000, "damage_type": "alligator_cracking", "severity_score": 0.65, "image_url": None},
+    # Delhi
+    {"latitude": 28.6200, "longitude": 77.2100, "damage_type": "pothole",            "severity_score": 0.97, "image_url": None},
+    {"latitude": 28.6350, "longitude": 77.2250, "damage_type": "pothole",            "severity_score": 0.89, "image_url": None},
+    {"latitude": 28.6100, "longitude": 77.1980, "damage_type": "alligator_cracking", "severity_score": 0.72, "image_url": None},
+    {"latitude": 28.6500, "longitude": 77.2400, "damage_type": "longitudinal_crack", "severity_score": 0.45, "image_url": None},
+    {"latitude": 28.5800, "longitude": 77.1800, "damage_type": "pothole",            "severity_score": 0.86, "image_url": None},
+    {"latitude": 28.6700, "longitude": 77.2600, "damage_type": "alligator_cracking", "severity_score": 0.61, "image_url": None},
+    # Mumbai
+    {"latitude": 19.0800, "longitude": 72.8800, "damage_type": "pothole",            "severity_score": 0.99, "image_url": None},
+    {"latitude": 19.0700, "longitude": 72.8700, "damage_type": "pothole",            "severity_score": 0.92, "image_url": None},
+    {"latitude": 19.0900, "longitude": 72.8900, "damage_type": "alligator_cracking", "severity_score": 0.83, "image_url": None},
+    {"latitude": 19.0650, "longitude": 72.8650, "damage_type": "longitudinal_crack", "severity_score": 0.55, "image_url": None},
+    {"latitude": 19.1000, "longitude": 72.9000, "damage_type": "pothole",            "severity_score": 0.87, "image_url": None},
+    {"latitude": 19.0550, "longitude": 72.8550, "damage_type": "alligator_cracking", "severity_score": 0.67, "image_url": None},
+    # Bengaluru
+    {"latitude": 12.9800, "longitude": 77.6000, "damage_type": "pothole",            "severity_score": 0.90, "image_url": None},
+    {"latitude": 12.9600, "longitude": 77.5800, "damage_type": "alligator_cracking", "severity_score": 0.74, "image_url": None},
+    {"latitude": 12.9900, "longitude": 77.6100, "damage_type": "longitudinal_crack", "severity_score": 0.39, "image_url": None},
+    {"latitude": 12.9500, "longitude": 77.5700, "damage_type": "pothole",            "severity_score": 0.85, "image_url": None},
+    {"latitude": 13.0000, "longitude": 77.6200, "damage_type": "alligator_cracking", "severity_score": 0.58, "image_url": None},
+    # Pune
+    {"latitude": 18.5300, "longitude": 73.8600, "damage_type": "pothole",            "severity_score": 0.94, "image_url": None},
+    {"latitude": 18.5100, "longitude": 73.8400, "damage_type": "pothole",            "severity_score": 0.88, "image_url": None},
+    {"latitude": 18.5400, "longitude": 73.8700, "damage_type": "alligator_cracking", "severity_score": 0.70, "image_url": None},
+    {"latitude": 18.5000, "longitude": 73.8300, "damage_type": "longitudinal_crack", "severity_score": 0.47, "image_url": None},
+    {"latitude": 18.5500, "longitude": 73.8800, "damage_type": "pothole",            "severity_score": 0.82, "image_url": None},
+    # Hyderabad
+    {"latitude": 17.3850, "longitude": 78.4867, "damage_type": "pothole",            "severity_score": 0.93, "image_url": None},
+    {"latitude": 17.3950, "longitude": 78.4967, "damage_type": "longitudinal_crack", "severity_score": 0.36, "image_url": None},
+]
+
+@app.post("/api/v1/seed", status_code=status.HTTP_201_CREATED)
+async def seed_training_data(db: AsyncSession = Depends(get_db)):
+    """Insert 30 sample road damage events across 5 Indian cities for demo/training."""
+    events = [DetectionEvent(**ev) for ev in SEED_EVENTS]
+    db.add_all(events)
+    await db.commit()
+    return {"message": f"✅ Seeded {len(events)} training events successfully.", "count": len(events)}
+
+@app.delete("/api/v1/seed", status_code=status.HTTP_200_OK)
+async def clear_all_detections(db: AsyncSession = Depends(get_db)):
+    """Delete ALL detection events (use with caution — for reset/demo purposes)."""
+    result = await db.execute(select(DetectionEvent))
+    all_events = result.scalars().all()
+    for ev in all_events:
+        await db.delete(ev)
+    await db.commit()
+    return {"message": f"🗑 Deleted {len(all_events)} events."}
+
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

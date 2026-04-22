@@ -7,19 +7,23 @@ databases:
 services:
   - type: web
     name: smartroad-api
-    env: docker
+    env: python
     plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head || true && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: smartroad-db
           property: connectionString
+      - key: PYTHON_VERSION
+        value: 3.10.12
       - key: CLOUDINARY_CLOUD_NAME
-        sync: false
+        value: dtlwfmuaq
       - key: CLOUDINARY_API_KEY
-        sync: false
+        value: "597324926383668"
       - key: CLOUDINARY_API_SECRET
-        sync: false
+        value: 4ayiXeY5hmUCSM33XCe5COFScv8
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN

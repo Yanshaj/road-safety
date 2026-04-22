@@ -1,207 +1,314 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SmartRoad Live Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <style>
-        body { background-color: #0f172a; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc; }
-        #map { height: 400px; border-radius: 0.75rem; z-index: 10; }
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-        .severity-high { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
-        .severity-medium { color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
-        .severity-low { color: #10b981; background: rgba(16, 185, 129, 0.1); }
-        
-        /* Custom map popup styling */
-        .leaflet-popup-content-wrapper { background-color: #1e293b; color: #f8fafc; border: 1px solid rgba(255,255,255,0.1); }
-        .leaflet-popup-tip { background-color: #1e293b; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartRoad Live Dashboard</title>
+<meta name="description" content="Real-time road damage monitoring dashboard with live map and event log.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060912;--surface:#0d1425;--card:#111827;--border:#1e2d4a;
+  --amber:#f59e0b;--amber2:#fbbf24;--blue:#3b82f6;--green:#10b981;--red:#ef4444;
+  --text:#f1f5f9;--muted:#64748b;--subtle:#1e2d4a;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden}
+
+/* NAV */
+nav{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:200;flex-shrink:0}
+.nav-logo{display:flex;align-items:center;gap:.5rem;font-size:1.1rem;font-weight:900;color:var(--text)}
+.nav-logo span{color:var(--amber)}
+.nav-right{display:flex;align-items:center;gap:1rem}
+.live-pill{display:flex;align-items:center;gap:.5rem;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#34d399;padding:.375rem .875rem;border-radius:999px;font-size:.75rem;font-weight:700}
+.live-dot{width:7px;height:7px;background:#34d399;border-radius:50%;animation:pulse 1.5s ease infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.back-btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:.5rem 1rem;border-radius:.5rem;font-size:.8rem;font-weight:600;text-decoration:none;transition:all .2s}
+.back-btn:hover{border-color:var(--amber);color:var(--amber)}
+
+/* MAIN LAYOUT */
+main{flex:1;display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:1fr;gap:0;padding:1.5rem;gap:1.5rem;max-width:1400px;margin:0 auto;width:100%}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:1rem;padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;transition:border-color .2s}
+.stat-card:hover{border-color:var(--subtle)}
+.stat-icon{width:2.75rem;height:2.75rem;border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex-shrink:0}
+.stat-info .label{font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.25rem}
+.stat-info .value{font-size:1.75rem;font-weight:900;line-height:1}
+.stat-card.highlight{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.04)}
+.stat-card.highlight .value{color:var(--amber)}
+
+/* CONTENT GRID */
+.content-grid{display:grid;grid-template-columns:1fr 400px;gap:1.5rem;align-items:start}
+
+/* MAP */
+.map-panel{background:var(--card);border:1px solid var(--border);border-radius:1.25rem;overflow:hidden}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border)}
+.panel-title{font-size:.9rem;font-weight:700;display:flex;align-items:center;gap:.5rem}
+.panel-title span{color:var(--amber)}
+#map{height:420px}
+.leaflet-popup-content-wrapper{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:.75rem;box-shadow:0 20px 40px rgba(0,0,0,.5)}
+.leaflet-popup-tip{background:var(--card)}
+.leaflet-popup-content{margin:.75rem}
+.popup-img{width:100%;height:100px;object-fit:cover;border-radius:.5rem;margin:.5rem 0;border:1px solid var(--border)}
+
+/* EVENT LOG */
+.log-panel{background:var(--card);border:1px solid var(--border);border-radius:1.25rem;overflow:hidden;max-height:490px;display:flex;flex-direction:column}
+.log-body{overflow-y:auto;flex:1}
+.log-body::-webkit-scrollbar{width:4px}
+.log-body::-webkit-scrollbar-track{background:transparent}
+.log-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px}
+.event-item{display:flex;gap:.875rem;padding:1rem 1.25rem;border-bottom:1px solid var(--border);transition:background .15s;align-items:flex-start;cursor:pointer}
+.event-item:hover{background:rgba(255,255,255,.02)}
+.event-item:last-child{border-bottom:none}
+.event-thumb{width:44px;height:44px;border-radius:.5rem;object-fit:cover;border:1px solid var(--border);flex-shrink:0;background:var(--surface)}
+.event-thumb-placeholder{width:44px;height:44px;border-radius:.5rem;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.event-info{flex:1;min-width:0}
+.event-top{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.25rem}
+.event-type{font-size:.8rem;font-weight:700;text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{display:inline-flex;align-items:center;padding:.2rem .6rem;border-radius:999px;font-size:.65rem;font-weight:700;border:1px solid;white-space:nowrap}
+.badge.critical{color:var(--red);border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.08)}
+.badge.warning{color:var(--amber);border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.08)}
+.badge.minor{color:var(--green);border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.08)}
+.event-meta{font-size:.7rem;color:var(--muted)}
+.empty-state{padding:3rem;text-align:center;color:var(--muted)}
+.empty-state .icon{font-size:2.5rem;margin-bottom:1rem}
+
+/* TABLE */
+.table-panel{background:var(--card);border:1px solid var(--border);border-radius:1.25rem;overflow:hidden}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.825rem}
+thead{background:var(--surface)}
+th{padding:.875rem 1.25rem;text-align:left;font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:.875rem 1.25rem;border-bottom:1px solid rgba(30,45,74,.5);color:#cbd5e1;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:rgba(255,255,255,.02)}
+.td-img{width:40px;height:40px;object-fit:cover;border-radius:.4rem;border:1px solid var(--border)}
+.td-img-placeholder{width:40px;height:40px;border-radius:.4rem;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.id-cell{font-family:monospace;color:var(--muted);font-size:.75rem}
+.type-cell{font-weight:600;color:var(--text);text-transform:capitalize}
+.coord-cell{font-family:monospace;font-size:.7rem;color:var(--muted)}
+
+/* REFRESH BTN */
+.refresh-btn{display:flex;align-items:center;gap:.375rem;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:.375rem .75rem;border-radius:.5rem;font-size:.75rem;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.refresh-btn:hover{border-color:var(--amber);color:var(--amber)}
+.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* LEGEND */
+.legend{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:.375rem;font-size:.7rem;color:var(--muted)}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+
+@media(max-width:1100px){
+  .content-grid{grid-template-columns:1fr}
+  .log-panel{max-height:300px}
+}
+@media(max-width:768px){
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  main{padding:1rem;gap:1rem}
+}
+@media(max-width:480px){
+  .stats-row{grid-template-columns:1fr 1fr}
+}
+</style>
 </head>
-<body class="antialiased min-h-screen flex flex-col">
+<body>
 
-    <nav class="w-full bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50 flex justify-between items-center">
-        <div>
-            <h1 class="text-xl font-bold text-white flex items-center gap-2">
-                <span class="text-amber-500">⚡</span> SmartRoad Live Dashboard
-            </h1>
-            <p class="text-xs text-slate-400 mt-1 uppercase tracking-wider">Real-Time Anomaly Detection System</p>
+<nav>
+  <div class="nav-logo"><span>⚡</span> SmartRoad <span style="color:var(--muted);font-weight:400;margin-left:.25rem">Dashboard</span></div>
+  <div class="nav-right">
+    <div class="live-pill"><div class="live-dot"></div>Live</div>
+    <a href="/" class="back-btn">← Home</a>
+  </div>
+</nav>
+
+<main>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(59,130,246,.1)">📊</div>
+      <div class="stat-info"><div class="label">Total Events</div><div class="value" id="stat-total">—</div></div>
+    </div>
+    <div class="stat-card highlight">
+      <div class="stat-icon" style="background:rgba(245,158,11,.1)">🚨</div>
+      <div class="stat-info"><div class="label">High Severity</div><div class="value" id="stat-high">—</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(239,68,68,.1)">🕳️</div>
+      <div class="stat-info"><div class="label">Potholes</div><div class="value" id="stat-potholes">—</div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="background:rgba(16,185,129,.1)">🕐</div>
+      <div class="stat-info"><div class="label">Last Refresh</div><div class="value" style="font-size:1rem;padding-top:.25rem" id="stat-time">—</div></div>
+    </div>
+  </div>
+
+  <!-- MAP + LOG -->
+  <div class="content-grid">
+    <div class="map-panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>🗺</span> Live Incident Map</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Critical</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Warning</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Minor</div>
         </div>
-        <div>
-            <a href="rb.html" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm transition-colors text-white">
-                ⬅ Back to Synopsis
-            </a>
+      </div>
+      <div id="map"></div>
+    </div>
+
+    <div class="log-panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>📋</span> Event Feed</div>
+        <button class="refresh-btn" id="refreshBtn" onclick="fetchData()">
+          <span id="refreshIcon">🔄</span> Refresh
+        </button>
+      </div>
+      <div class="log-body" id="eventFeed">
+        <div class="empty-state"><div class="icon">⏳</div><p>Loading events…</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-panel">
+    <div class="panel-header">
+      <div class="panel-title"><span>📁</span> Full Detection Log</div>
+      <button class="refresh-btn" onclick="fetchData()">🔄 Refresh</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Evidence</th>
+            <th>ID</th>
+            <th>Timestamp</th>
+            <th>Type</th>
+            <th>Severity</th>
+            <th>Coordinates</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const map = L.map('map').setView([20.5937, 78.9629], 5);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:20
+}).addTo(map);
+
+let markers=[];
+
+function getSeverityClass(s){return s>=0.8?'critical':s>=0.5?'warning':'minor'}
+function getSeverityLabel(s){return s>=0.8?'Critical':s>=0.5?'Warning':'Minor'}
+
+function badge(s){
+  return `<span class="badge ${getSeverityClass(s)}">${(s*100).toFixed(0)}% ${getSeverityLabel(s)}</span>`;
+}
+
+function imgTag(url,cls){
+  if(!url) return `<div class="${cls || 'td-img-placeholder'}">📷</div>`;
+  return `<img src="${url}" class="${cls||'td-img'}" onerror="this.outerHTML='<div class=\\'td-img-placeholder\\'>📷</div>'" alt="Evidence">`;
+}
+
+function updateFeed(data){
+  const feed=document.getElementById('eventFeed');
+  if(!data.length){
+    feed.innerHTML='<div class="empty-state"><div class="icon">📭</div><p>No events yet.</p></div>';
+    return;
+  }
+  feed.innerHTML=data.slice(0,30).map(ev=>{
+    const dt=new Date(ev.timestamp).toLocaleString();
+    return `<div class="event-item">
+      ${ev.image_url
+        ? `<img src="${ev.image_url}" class="event-thumb" onerror="this.outerHTML='<div class=\\'event-thumb-placeholder\\'>📷</div>'" alt="">`
+        : '<div class="event-thumb-placeholder">📷</div>'}
+      <div class="event-info">
+        <div class="event-top">
+          <div class="event-type">${ev.damage_type.replace(/_/g,' ')}</div>
+          ${badge(ev.severity_score)}
         </div>
-    </nav>
+        <div class="event-meta">#${ev.id} · ${dt}</div>
+        <div class="event-meta">${ev.latitude.toFixed(4)}, ${ev.longitude.toFixed(4)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
-    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-8">
-        
-        <!-- Top Stats Row -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="glass-panel rounded-xl p-6 flex flex-col justify-center items-center">
-                <div class="text-slate-400 text-sm uppercase tracking-wide font-semibold mb-1">Total Detections</div>
-                <div class="text-4xl font-bold text-white" id="stat-total">-</div>
-            </div>
-            <div class="glass-panel rounded-xl p-6 flex flex-col justify-center items-center border-t-4 border-amber-500">
-                <div class="text-slate-400 text-sm uppercase tracking-wide font-semibold mb-1">High Severity Alerts</div>
-                <div class="text-4xl font-bold text-amber-500" id="stat-high">-</div>
-            </div>
-            <div class="glass-panel rounded-xl p-6 flex flex-col justify-center items-center">
-                <div class="text-slate-400 text-sm uppercase tracking-wide font-semibold mb-1">Last Update</div>
-                <div class="text-lg font-bold text-slate-300 mt-2" id="stat-time">-</div>
-            </div>
-        </div>
+function updateTable(data){
+  const tbody=document.getElementById('table-body');
+  if(!data.length){
+    tbody.innerHTML='<tr><td colspan="6" class="empty-state">No detections found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML=data.map(ev=>`
+    <tr>
+      <td>${imgTag(ev.image_url)}</td>
+      <td class="id-cell">#${ev.id}</td>
+      <td>${new Date(ev.timestamp).toLocaleString()}</td>
+      <td class="type-cell">${ev.damage_type.replace(/_/g,' ')}</td>
+      <td>${badge(ev.severity_score)}</td>
+      <td class="coord-cell">${ev.latitude.toFixed(4)}, ${ev.longitude.toFixed(4)}</td>
+    </tr>`).join('');
+}
 
-        <!-- Map Section -->
-        <div class="glass-panel rounded-xl p-1 md:p-2 border border-slate-700">
-            <div id="map" class="w-full"></div>
-        </div>
+function updateMap(data){
+  markers.forEach(m=>map.removeLayer(m));
+  markers=[];
+  const bounds=[];
+  data.forEach(ev=>{
+    const color=ev.severity_score>=0.8?'#ef4444':ev.severity_score>=0.5?'#f59e0b':'#10b981';
+    const c=L.circleMarker([ev.latitude,ev.longitude],{radius:9,fillColor:color,color:'#fff',weight:1.5,opacity:1,fillOpacity:.85}).addTo(map);
+    const img=ev.image_url?`<img src="${ev.image_url}" class="popup-img" onerror="this.style.display='none'" alt="">`:'';
+    c.bindPopup(`<div style="min-width:160px">
+      <div style="font-weight:700;color:var(--amber);margin-bottom:.35rem">Event #${ev.id}</div>
+      ${img}
+      <div style="font-size:.8rem;font-weight:600;text-transform:capitalize;margin-bottom:.25rem">${ev.damage_type.replace(/_/g,' ')}</div>
+      ${badge(ev.severity_score)}
+      <div style="font-size:.7rem;color:#64748b;margin-top:.35rem">${new Date(ev.timestamp).toLocaleString()}</div>
+    </div>`);
+    markers.push(c);
+    bounds.push([ev.latitude,ev.longitude]);
+  });
+  if(bounds.length) map.fitBounds(bounds,{padding:[40,40],maxZoom:14});
+}
 
-        <!-- Data Table Section -->
-        <div class="glass-panel rounded-xl overflow-hidden border border-slate-700 flex-1">
-            <div class="p-5 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
-                <h2 class="text-lg font-bold text-white">Recent Event Log</h2>
-                <button onclick="fetchData()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded transition-colors flex items-center gap-2">
-                    <span>🔄 Refresh</span>
-                </button>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm text-slate-300">
-                    <thead class="bg-slate-800 text-slate-400 uppercase text-xs">
-                        <tr>
-                            <th class="px-6 py-4">Evidence</th>
-                            <th class="px-6 py-4">ID</th>
-                            <th class="px-6 py-4">Timestamp</th>
-                            <th class="px-6 py-4">Damage Type</th>
-                            <th class="px-6 py-4">Severity</th>
-                            <th class="px-6 py-4">Coordinates</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-body" class="divide-y divide-slate-800">
-                        <tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">Loading data...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
+async function fetchData(){
+  const icon=document.getElementById('refreshIcon');
+  icon.classList.add('spin');
+  try{
+    const res=await fetch('/api/v1/detections');
+    if(!res.ok) throw new Error('API error');
+    const data=await res.json();
+    document.getElementById('stat-total').textContent=data.length;
+    document.getElementById('stat-high').textContent=data.filter(d=>d.severity_score>=0.8).length;
+    document.getElementById('stat-potholes').textContent=data.filter(d=>d.damage_type==='pothole').length;
+    document.getElementById('stat-time').textContent=new Date().toLocaleTimeString();
+    updateFeed(data);
+    updateTable(data);
+    updateMap(data);
+  }catch(e){
+    document.getElementById('table-body').innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:#f87171">⚠ Failed to load — is the backend running?</td></tr>';
+    document.getElementById('eventFeed').innerHTML='<div class="empty-state"><div class="icon">⚠️</div><p>Cannot reach server.</p></div>';
+  }finally{
+    icon.classList.remove('spin');
+  }
+}
 
-    <script>
-        // Initialize Map
-        const map = L.map('map').setView([37.7749, -122.4194], 12); // Default to SF or center of your data
-        
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 20
-        }).addTo(map);
-
-        let markers = [];
-
-        function getSeverityBadge(score) {
-            if(score >= 0.8) return `<span class="px-2.5 py-1 rounded-full text-xs font-bold severity-high border border-red-500/20">${(score*100).toFixed(1)}% Critical</span>`;
-            if(score >= 0.5) return `<span class="px-2.5 py-1 rounded-full text-xs font-bold severity-medium border border-amber-500/20">${(score*100).toFixed(1)}% Warning</span>`;
-            return `<span class="px-2.5 py-1 rounded-full text-xs font-bold severity-low border border-emerald-500/20">${(score*100).toFixed(1)}% Minor</span>`;
-        }
-
-        async function fetchData() {
-            try {
-                const response = await fetch('/api/v1/detections');
-                const data = await response.json();
-                
-                updateDashboard(data);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                document.getElementById('table-body').innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-400">Failed to load data. Is the backend running?</td></tr>`;
-            }
-        }
-
-        function updateDashboard(data) {
-            // Update Stats
-            document.getElementById('stat-total').innerText = data.length;
-            const highSeverityCount = data.filter(d => d.severity_score >= 0.8).length;
-            document.getElementById('stat-high').innerText = highSeverityCount;
-            document.getElementById('stat-time').innerText = new Date().toLocaleTimeString();
-
-            // Clear old markers
-            markers.forEach(m => map.removeLayer(m));
-            markers = [];
-
-            // Update Map and Table
-            const tbody = document.getElementById('table-body');
-            tbody.innerHTML = '';
-
-            if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-500">No detection events found.</td></tr>`;
-                return;
-            }
-
-            const bounds = [];
-
-            data.forEach(event => {
-                const date = new Date(event.timestamp);
-                const formattedDate = date.toLocaleString();
-                
-                // Add Marker
-                const markerColor = event.severity_score >= 0.8 ? 'red' : (event.severity_score >= 0.5 ? 'orange' : 'green');
-                const circle = L.circleMarker([event.latitude, event.longitude], {
-                    radius: 8,
-                    fillColor: markerColor,
-                    color: "#fff",
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                }).addTo(map);
-                
-                const imgHtml = event.image_url ? `<img src="${event.image_url}" class="w-full h-32 object-cover rounded mt-2 mb-2 border border-slate-700">` : '';
-                
-                circle.bindPopup(`
-                    <div class="p-1 w-48">
-                        <div class="font-bold text-amber-400 mb-1 flex items-center justify-between">
-                            <span>Event #${event.id}</span>
-                            ${getSeverityBadge(event.severity_score)}
-                        </div>
-                        ${imgHtml}
-                        <div class="text-sm"><b>Type:</b> <span class="capitalize">${event.damage_type.replace('_', ' ')}</span></div>
-                        <div class="text-xs text-slate-400 mt-2">${formattedDate}</div>
-                    </div>
-                `);
-                
-                markers.push(circle);
-                bounds.push([event.latitude, event.longitude]);
-
-                // Add Table Row
-                const imgCell = event.image_url ? `<img src="${event.image_url}" class="w-12 h-12 rounded object-cover border border-slate-700">` : '<div class="w-12 h-12 bg-slate-800 rounded border border-slate-700 flex items-center justify-center text-xs text-slate-500">N/A</div>';
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-800/50 transition-colors";
-                tr.innerHTML = `
-                    <td class="px-6 py-3">${imgCell}</td>
-                    <td class="px-6 py-4 font-mono text-slate-400">#${event.id}</td>
-                    <td class="px-6 py-4">${formattedDate}</td>
-                    <td class="px-6 py-4 font-semibold capitalize text-white">${event.damage_type.replace('_', ' ')}</td>
-                    <td class="px-6 py-4">${getSeverityBadge(event.severity_score)}</td>
-                    <td class="px-6 py-4 font-mono text-xs text-slate-400">${event.latitude.toFixed(4)}, ${event.longitude.toFixed(4)}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            // Fit map to markers
-            if (bounds.length > 0) {
-                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-            }
-        }
-
-        // Initial fetch
-        fetchData();
-        
-        // Auto refresh every 10 seconds
-        setInterval(fetchData, 10000);
-    </script>
+fetchData();
+setInterval(fetchData,10000);
+</script>
 </body>
 </html>

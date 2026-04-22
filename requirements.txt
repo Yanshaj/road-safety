@@ -8,3 +8,4 @@ twilio
 python-dotenv
 greenlet
 python-multipart
+cloudinary

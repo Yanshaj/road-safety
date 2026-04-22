@@ -1,9 +1,9 @@
 import os
 import asyncio
-import shutil
-import uuid
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends, status, BackgroundTasks, UploadFile, File
+import cloudinary
+import cloudinary.uploader
+from fastapi import FastAPI, Depends, status, BackgroundTasks, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,11 +16,15 @@ from twilio.rest import Client
 
 load_dotenv()
 
-app = FastAPI(title="Detection API")
+# Configure Cloudinary using environment variables
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True
+)
 
-# Mount uploads directory for serving images statically
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app = FastAPI(title="Detection API")
 
 # Add CORS middleware to allow the frontend to fetch data
 app.add_middleware(
@@ -82,14 +86,19 @@ async def create_detection(event: DetectionEventCreate, background_tasks: Backgr
 
 @app.post("/api/v1/upload")
 async def upload_image(file: UploadFile = File(...)):
-    file_extension = file.filename.split('.')[-1]
-    filename = f"{uuid.uuid4()}.{file_extension}"
-    file_path = f"uploads/{filename}"
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    return {"image_url": f"/uploads/{filename}"}
+    """Upload image to Cloudinary for permanent cloud storage."""
+    try:
+        contents = await file.read()
+        # Upload to Cloudinary — returns a permanent HTTPS URL
+        result = await asyncio.to_thread(
+            cloudinary.uploader.upload,
+            contents,
+            folder="smartroad",
+            resource_type="image"
+        )
+        return {"image_url": result["secure_url"]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
 
 @app.get("/api/v1/detections", response_model=List[DetectionEventResponse])
 async def get_detections(db: AsyncSession = Depends(get_db)):
